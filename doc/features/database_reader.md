@@ -148,7 +148,23 @@ type BucketInfo struct {
 
 ### DevboxStorageInfo
 
-包含 devbox 存储信息：内容 ID、LVM 卷名、路径、状态等。
+包含 devbox 存储信息：
+
+```go
+type DevboxStorageInfo struct {
+    ContentID   string `json:"content_id"`         // 内容 ID
+    LvName      string `json:"lv_name"`            // LVM 卷名
+    Path        string `json:"path"`                // 挂载路径
+    Status      string `json:"status"`              // 状态 (active/removed)
+    SnapshotKey string `json:"snapshot_key,omitempty"` // 关联的快照 key (可选)
+}
+```
+
+**读取的字段**:
+- `lv_name`: LVM 卷名
+- `path`: 挂载路径
+- `status`: 状态信息
+- `snapshot_key`: 关联的快照 key（如果存在）
 
 ## 使用示例
 

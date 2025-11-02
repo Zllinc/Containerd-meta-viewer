@@ -12,7 +12,7 @@ containerd-meta-viewer/
 │   ├── root.go            # 根命令和全局参数
 │   ├── buckets.go         # buckets 相关命令
 │   ├── snapshots.go       # snapshots 相关命令
-│   └── containerd.go          # containerd 相关命令
+│   └── devbox.go          # devbox 相关命令
 ├── internal/              # 内部实现包
 │   ├── database/          # 数据库操作
 │   │   ├── reader.go      # BoltDB 读取器
@@ -26,8 +26,14 @@ containerd-meta-viewer/
 ├── go.sum                 # Go 模块校验
 ├── main.go                # 程序入口点
 ├── DEVELOPMENT.md         # 开发文档
-└── README.md              # 使用文档
+├── README.md              # 使用文档
+└── doc/                   # 文档目录
+    ├── ARCHITECTURE.md    # 架构与技术文档
+    ├── features/          # 功能实现文档
+    └── changelog/         # 功能变更记录
 ```
+
+**详细架构说明**: 请参考 [ARCHITECTURE.md](ARCHITECTURE.md) 了解完整的架构设计和技术栈。
 
 ## 开发规范
 

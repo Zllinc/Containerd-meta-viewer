@@ -138,9 +138,9 @@ containerd-meta-viewer --db-path /path/to/metadata.db devbox list
 
 输出示例：
 ```
-CONTENT_ID    LV_NAME            PATH                            STATUS
-abc123        lv-devbox-abc123   /var/lib/containerd/devbox/...  active
-def456        lv-devbox-def456   /var/lib/containerd/devbox/...  active
+CONTENT_ID    LV_NAME            PATH                            STATUS  SNAPSHOT_KEY
+abc123        lv-devbox-abc123   /var/lib/containerd/devbox/...  active  k8s.io/1234/sha256:abc...
+def456        lv-devbox-def456   /var/lib/containerd/devbox/...  active  -
 ```
 
 ##### 查看特定 Devbox 存储条目
@@ -153,10 +153,11 @@ containerd-meta-viewer --db-path /path/to/metadata.db devbox get <content-id>
 ```
 Devbox Storage Information:
 ==========================
-ContentID: abc123
-LV Name:   lv-devbox-abc123
-Path:      /var/lib/containerd/devbox/mounts/abc123
-Status:    active
+ContentID:   abc123
+LV Name:     lv-devbox-abc123
+Path:        /var/lib/containerd/devbox/mounts/abc123
+Status:      active
+Snapshot Key: k8s.io/1234/sha256:abc123...
 ```
 
 ##### 查看 LVM 映射
@@ -315,7 +316,8 @@ v1/
     └── <content-id>    # 按contentID组织
         ├── lv_name     # LVM卷名
         ├── path        # 挂载路径
-        └── status      # 状态(active/removed)
+        ├── status      # 状态(active/removed)
+        └── snapshot_key # 关联的快照key（可选）
 ```
 
 ## 贡献

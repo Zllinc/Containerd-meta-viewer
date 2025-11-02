@@ -26,6 +26,7 @@ var (
 	DevboxStoragePathBucket = []byte("devbox_storage_path")
 	DevboxKeyLvName         = []byte("lv_name")
 	DevboxKeyStatus         = []byte("status")
+	DevboxKeySnapshotKey    = []byte("snapshot_key")
 	DevboxStatusActive      = []byte("active")
 	DevboxStatusRemoved     = []byte("removed")
 )
@@ -367,6 +368,10 @@ func (r *MetaReader) readDevboxStorageInfo(contentID string, bkt *bolt.Bucket) (
 
 	if statusData := bkt.Get(DevboxKeyStatus); statusData != nil {
 		info.Status = string(statusData)
+	}
+
+	if snapshotKeyData := bkt.Get(DevboxKeySnapshotKey); snapshotKeyData != nil {
+		info.SnapshotKey = string(snapshotKeyData)
 	}
 
 	return info, nil

@@ -73,12 +73,15 @@ containerd-meta-viewer/
 ### 数据库读取器 (`database/reader.go`)
 
 负责所有 BoltDB 的读取操作：
+- `NewMetaReader()`: 创建数据库读取器，自动处理数据库锁定情况
 - `ListBuckets()`: 列出所有顶级 bucket
 - `ListSnapshots()`: 列出所有快照
 - `GetSnapshot(key)`: 获取特定快照
 - `ListDevboxStorage()`: 列出所有 containerd 存储条目
 - `GetDevboxStorage(contentID)`: 获取特定 containerd 存储条目
 - `SearchSnapshots()`: 搜索快照
+
+**数据库锁定处理**: 当数据库被 containerd 进程锁定时，会自动复制数据库到临时文件进行读取。详细原理见 `doc/features/database_reader.md`。
 
 ### 数据模型 (`database/models.go`)
 
@@ -191,6 +194,80 @@ func (f *TableFormatter) FormatNewFeatures(features []NewFeatureInfo) error {
 }
 ```
 
+## 数据库锁定处理
+
+### 自动复制机制
+
+当 containerd 进程以写模式锁定数据库时，工具会自动处理：
+
+1. **检测锁定**: 尝试以 ReadOnly 模式打开数据库（1秒超时）
+2. **自动复制**: 如果检测到锁定，自动复制数据库文件到临时位置
+3. **从副本读取**: 从临时副本读取数据，完全透明
+4. **自动清理**: 读取完成后自动删除临时文件
+
+详细实现原理请参考 `doc/features/database_reader.md`。
+
+## 文档维护规范
+
+### 必须同步的文档
+
+每次修改代码后，**必须**同步更新以下文档：
+
+1. **功能实现文档** (`doc/features/`)
+   - 如果修改了功能实现逻辑，更新对应的功能文档
+   - 例如：修改了数据库读取逻辑 → 更新 `doc/features/database_reader.md`
+   - 添加了新功能 → 创建新的功能文档
+
+2. **功能迭代文档** (`doc/changelog/features/`)
+   - **必须**记录每次功能变更
+   - 文件命名：以功能名称命名（如 `database_reader.md`）
+   - 每次变更都要记录：
+     - 变更日期（格式：YYYY-MM-DD）
+     - 变更前的实现方式
+     - 变更后的实现方式
+     - 变更原因和影响
+   - 例如：修改了数据库锁定处理 → 更新 `doc/changelog/features/database_reader.md`
+
+3. **开发文档** (`doc/DEVELOPMENT.md`)
+   - 如果修改了开发规范、架构或流程，更新本文档
+
+4. **用户文档** (`README.md`)
+   - 如果添加了新功能或修改了用户可见的行为，更新用户文档
+   - 特别是故障排除部分，要包含常见问题和解决方案
+
+### 文档同步检查清单
+
+在提交代码前，检查以下事项：
+
+- [ ] 是否修改了核心功能逻辑？
+  - [ ] 是 → 更新 `doc/features/` 中对应的功能文档
+- [ ] 是否修改了任何功能的行为？
+  - [ ] 是 → 在 `doc/changelog/features/` 中记录变更
+- [ ] 是否添加了新功能？
+  - [ ] 是 → 创建新的功能文档和变更记录
+- [ ] 是否修改了开发规范或流程？
+  - [ ] 是 → 更新 `doc/DEVELOPMENT.md`
+- [ ] 是否修改了用户可见的行为？
+  - [ ] 是 → 更新 `README.md`
+
+### 文档目录结构
+
+```
+doc/
+├── DEVELOPMENT.md              # 开发文档
+├── TEST.md                     # 测试文档
+├── OSS_DEPLOYMENT.md           # OSS 部署文档
+├── RENAME_SUMMARY.md           # 重命名总结
+├── features/                   # 功能实现文档（每个功能一个文件）
+│   ├── database_reader.md     # 数据库读取功能实现
+│   ├── buckets_command.md     # buckets 命令实现（待创建）
+│   └── ...
+└── changelog/                   # 功能变更记录
+    └── features/               # 按功能分类的变更记录
+        ├── database_reader.md  # 数据库读取功能变更历史
+        └── ...
+```
+
 ## 注意事项
 
 1. **数据库安全**：所有数据库操作使用只读模式，确保不会修改原始数据
@@ -198,6 +275,7 @@ func (f *TableFormatter) FormatNewFeatures(features []NewFeatureInfo) error {
 3. **向后兼容**：任何修改都要确保向后兼容性
 4. **性能考虑**：对于大型数据库，考虑分页或限制输出结果数量
 5. **内存使用**：及时关闭数据库连接，避免内存泄漏
+6. **文档同步**：修改代码后必须同步更新相关文档（见上文"文档维护规范"）
 
 ## 调试技巧
 

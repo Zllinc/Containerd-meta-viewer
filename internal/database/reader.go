@@ -2,6 +2,9 @@ package database
 
 import (
 	"fmt"
+	"io"
+	"os"
+	"time"
 
 	"github.com/containerd/containerd/metadata/boltutil"
 	"github.com/containerd/containerd/snapshots"
@@ -10,44 +13,113 @@ import (
 )
 
 var (
-	bucketKeyStorageVersion     = []byte("v1")
-	bucketKeySnapshot          = []byte("snapshots")
-	bucketKeyParents           = []byte("parents")
-	bucketKeyID               = []byte("id")
-	bucketKeyParent           = []byte("parent")
-	bucketKeyKind             = []byte("kind")
-	bucketKeyInodes           = []byte("inodes")
-	bucketKeySize             = []byte("size")
-	DevboxKeyContentID        = []byte("content_id")
-	DevboxKeyPath             = []byte("path")
-	DevboxStoragePathBucket   = []byte("devbox_storage_path")
-	DevboxKeyLvName           = []byte("lv_name")
-	DevboxKeyStatus           = []byte("status")
-	DevboxStatusActive        = []byte("active")
-	DevboxStatusRemoved       = []byte("removed")
+	bucketKeyStorageVersion = []byte("v1")
+	bucketKeySnapshot       = []byte("snapshots")
+	bucketKeyParents        = []byte("parents")
+	bucketKeyID             = []byte("id")
+	bucketKeyParent         = []byte("parent")
+	bucketKeyKind           = []byte("kind")
+	bucketKeyInodes         = []byte("inodes")
+	bucketKeySize           = []byte("size")
+	DevboxKeyContentID      = []byte("content_id")
+	DevboxKeyPath           = []byte("path")
+	DevboxStoragePathBucket = []byte("devbox_storage_path")
+	DevboxKeyLvName         = []byte("lv_name")
+	DevboxKeyStatus         = []byte("status")
+	DevboxStatusActive      = []byte("active")
+	DevboxStatusRemoved     = []byte("removed")
 )
 
 // MetaReader handles reading metadata from devbox snapshotter bolt database
 type MetaReader struct {
-	db *bolt.DB
+	db       *bolt.DB
+	tempPath string // Path to temporary copy if database was copied
 }
 
 // NewMetaReader creates a new MetaReader instance
+// If the database is locked by another process, it will automatically copy
+// the database file to a temporary location and read from the copy.
 func NewMetaReader(dbPath string) (*MetaReader, error) {
-	db, err := bolt.Open(dbPath, 0400, nil)
-	if err != nil {
+	// First, try to open in ReadOnly mode with a short timeout
+	opts := &bolt.Options{
+		ReadOnly: true,
+		Timeout:  1 * time.Second, // Short timeout to quickly detect lock
+	}
+	db, err := bolt.Open(dbPath, 0400, opts)
+
+	var tempPath string
+
+	// If we got a timeout (database is locked), try copying the file
+	if err != nil && err.Error() == "timeout" {
+		// Copy database to temporary file for reading
+		tempFile, err := os.CreateTemp("", "containerd-meta-viewer-*.db")
+		if err != nil {
+			return nil, fmt.Errorf("failed to create temporary file for database copy: %w", err)
+		}
+		tempPath = tempFile.Name()
+		tempFile.Close()
+
+		// Copy the database file
+		if err := copyFile(dbPath, tempPath); err != nil {
+			os.Remove(tempPath)
+			return nil, fmt.Errorf("failed to copy database file for reading: %w", err)
+		}
+
+		// Try to open the copy in ReadOnly mode
+		opts := &bolt.Options{
+			ReadOnly: true,
+		}
+		db, err = bolt.Open(tempPath, 0400, opts)
+		if err != nil {
+			os.Remove(tempPath)
+			return nil, fmt.Errorf("failed to open copied database: %w", err)
+		}
+	} else if err != nil {
+		// Other errors (file not found, permission denied, etc.)
 		return nil, fmt.Errorf("failed to open bolt database: %w", err)
 	}
 
-	return &MetaReader{db: db}, nil
+	return &MetaReader{db: db, tempPath: tempPath}, nil
 }
 
-// Close closes the database connection
+// Close closes the database connection and cleans up temporary files
 func (r *MetaReader) Close() error {
+	var err error
 	if r.db != nil {
-		return r.db.Close()
+		err = r.db.Close()
 	}
-	return nil
+
+	// Clean up temporary copy if it was created
+	if r.tempPath != "" {
+		if removeErr := os.Remove(r.tempPath); removeErr != nil && err == nil {
+			err = removeErr
+		}
+	}
+
+	return err
+}
+
+// copyFile copies a file from src to dst
+func copyFile(src, dst string) error {
+	sourceFile, err := os.Open(src)
+	if err != nil {
+		return fmt.Errorf("failed to open source file: %w", err)
+	}
+	defer sourceFile.Close()
+
+	destFile, err := os.Create(dst)
+	if err != nil {
+		return fmt.Errorf("failed to create destination file: %w", err)
+	}
+	defer destFile.Close()
+
+	_, err = io.Copy(destFile, sourceFile)
+	if err != nil {
+		return fmt.Errorf("failed to copy file: %w", err)
+	}
+
+	// Ensure the file is synced to disk
+	return destFile.Sync()
 }
 
 // ListBuckets returns all top-level buckets in the database

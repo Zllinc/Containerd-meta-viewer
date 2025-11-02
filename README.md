@@ -262,6 +262,7 @@ containerd-meta-viewer --db-path /path/to/metadata.db devbox list --output json 
    - 检查数据库文件是否存在（默认路径：`/var/lib/containerd/io.containerd.snapshotter.v1.devbox/metadata.db`）
    - 确保有读取该文件的权限
    - 如果默认路径不存在，使用 `--db-path` 指定正确的路径
+   - **数据库被锁定处理**：如果数据库被 containerd 进程锁定，工具会自动复制数据库到临时文件进行读取，无需手动操作
 
 2. **"v1 bucket not found"**
    - 数据库可能为空或损坏
@@ -270,6 +271,12 @@ containerd-meta-viewer --db-path /path/to/metadata.db devbox list --output json 
 3. **权限被拒绝**
    - 确保当前用户有读取数据库文件的权限
    - 可能需要使用 `sudo` 运行命令
+
+4. **数据库被锁定**
+   - **自动处理**：工具会自动检测数据库锁定状态，如果被 containerd 进程锁定，会自动复制数据库到临时位置进行读取
+   - 读取完成后会自动清理临时文件
+   - 这是自动化过程，用户无需担心
+   - 如果遇到临时文件相关的错误，可以手动清理 `/tmp/containerd-meta-viewer-*.db` 文件
 
 ### 调试技巧
 

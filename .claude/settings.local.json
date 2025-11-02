@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(go mod tidy:*)",
+      "Bash(go test:*)",
+      "Bash(go build:*)",
+      "Bash(./devbox-meta-viewer:*)",
+      "Bash(go mod init:*)",
+      "Bash(go get:*)",
+      "Bash(go run:*)",
+      "Bash(timeout:*)",
+      "Bash(make help:*)",
+      "Bash(make:*)",
+      "Bash(chmod:*)",
+      "Bash(.gitignore)",
+      "Bash(./scripts/deploy-example.sh:*)",
+      "Bash(find:*)",
+      "Bash(./containerd-meta-viewer:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

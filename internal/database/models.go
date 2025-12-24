@@ -27,10 +27,11 @@ type SnapshotInfo struct {
 
 // DevboxStorageInfo represents devbox-specific storage metadata
 type DevboxStorageInfo struct {
-	ContentID string `json:"content_id"`
-	LvName    string `json:"lv_name"`
-	Path      string `json:"path"`
-	Status    string `json:"status"`
+	ContentID   string `json:"content_id"`
+	LvName      string `json:"lv_name"`
+	Path        string `json:"path"`
+	Status      string `json:"status"`
+	SnapshotKey string `json:"snapshot_key,omitempty"`
 }
 
 // BucketInfo represents basic information about a bolt bucket

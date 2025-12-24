@@ -136,11 +136,11 @@ containerd-meta-viewer --db-path /path/to/metadata.db snapshots search --content
 containerd-meta-viewer --db-path /path/to/metadata.db devbox list
 ```
 
-输出示例：
+输出示例（包含关联的 snapshot key，便于与快照信息对应）：
 ```
-CONTENT_ID    LV_NAME            PATH                            STATUS
-abc123        lv-devbox-abc123   /var/lib/containerd/devbox/...  active
-def456        lv-devbox-def456   /var/lib/containerd/devbox/...  active
+CONTENT_ID    SNAPSHOT_KEY      LV_NAME            PATH                            STATUS
+abc123        sha256:abc...     lv-devbox-abc123   /var/lib/containerd/devbox/...  active
+def456        sha256:def...     lv-devbox-def456   /var/lib/containerd/devbox/...  active
 ```
 
 ##### 查看特定 Devbox 存储条目
@@ -173,6 +173,16 @@ LV_NAME            PATH
 lv-devbox-abc123   /var/lib/containerd/devbox/mounts/abc123
 lv-devbox-def456   /var/lib/containerd/devbox/mounts/def456
 ```
+
+##### 清除 Devbox snapshot key
+
+当 snapshot key 与实际快照不一致时，可以清理 devbox 条目中的 `snapshot_key` 字段：
+
+```bash
+containerd-meta-viewer --db-path /path/to/metadata.db devbox remove_key <content-id>
+```
+
+> ⚠️ 该操作会直接修改 metadata.db，需要对文件具有写权限，执行前请确保 containerd 未占用该数据库。
 
 ### 输出格式
 

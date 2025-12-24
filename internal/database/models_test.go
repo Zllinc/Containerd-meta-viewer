@@ -113,10 +113,11 @@ func TestSnapshotInfo(t *testing.T) {
 func TestDevboxStorageInfo(t *testing.T) {
 	t.Run("create devbox storage info", func(t *testing.T) {
 		info := DevboxStorageInfo{
-			ContentID: "test-content-id",
-			LvName:    "lv-test-volume",
-			Path:      "/test/mount/path",
-			Status:    "active",
+			ContentID:   "test-content-id",
+			LvName:      "lv-test-volume",
+			Path:        "/test/mount/path",
+			Status:      "active",
+			SnapshotKey: "sha256:test",
 		}
 
 		if info.ContentID != "test-content-id" {
@@ -133,6 +134,10 @@ func TestDevboxStorageInfo(t *testing.T) {
 
 		if info.Status != "active" {
 			t.Errorf("Expected Status = 'active', got %s", info.Status)
+		}
+
+		if info.SnapshotKey != "sha256:test" {
+			t.Errorf("Expected SnapshotKey = 'sha256:test', got %s", info.SnapshotKey)
 		}
 	})
 }

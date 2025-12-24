@@ -53,6 +53,7 @@ func TestDevboxSubcommands(t *testing.T) {
 		"list",
 		"get",
 		"lvm-map",
+		"remove_key",
 	}
 
 	for _, expected := range expectedSubcommands {
@@ -197,6 +198,40 @@ func TestDevboxLvmMapCmd(t *testing.T) {
 
 	if lvmMapCmd.RunE == nil {
 		t.Error("Expected devbox lvm-map command to have RunE function")
+	}
+}
+
+func TestDevboxRemoveKeyCmd(t *testing.T) {
+	var devboxCmd *cobra.Command
+	for _, cmd := range rootCmd.Commands() {
+		if cmd.Name() == "devbox" {
+			devboxCmd = cmd
+			break
+		}
+	}
+
+	if devboxCmd == nil {
+		t.Fatal("Expected devbox command to be registered")
+	}
+
+	var removeKeyCmd *cobra.Command
+	for _, cmd := range devboxCmd.Commands() {
+		if cmd.Name() == "remove_key" {
+			removeKeyCmd = cmd
+			break
+		}
+	}
+
+	if removeKeyCmd == nil {
+		t.Fatal("Expected devbox remove_key subcommand to be registered")
+	}
+
+	if removeKeyCmd.Use != "remove_key [content-id]" {
+		t.Errorf("Expected devbox remove_key command use = 'remove_key [content-id]', got %s", removeKeyCmd.Use)
+	}
+
+	if removeKeyCmd.RunE == nil {
+		t.Error("Expected devbox remove_key command to have RunE function")
 	}
 }
 

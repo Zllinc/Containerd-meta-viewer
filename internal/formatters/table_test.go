@@ -112,16 +112,18 @@ func TestTableFormatter_DataValidation(t *testing.T) {
 	t.Run("devbox storage data", func(t *testing.T) {
 		storage := []database.DevboxStorageInfo{
 			{
-				ContentID: "content-123",
-				LvName:    "lv-test-1",
-				Path:      "/mount/path/1",
-				Status:    "active",
+				ContentID:   "content-123",
+				SnapshotKey: "sha256:abc",
+				LvName:      "lv-test-1",
+				Path:        "/mount/path/1",
+				Status:      "active",
 			},
 			{
-				ContentID: "content-456",
-				LvName:    "", // Empty LV name
-				Path:      "/mount/path/2",
-				Status:    "removed",
+				ContentID:   "content-456",
+				SnapshotKey: "",
+				LvName:      "", // Empty LV name
+				Path:        "/mount/path/2",
+				Status:      "removed",
 			},
 		}
 
@@ -142,6 +144,9 @@ func TestTableFormatter_DataValidation(t *testing.T) {
 		if storage[0].Status != "active" {
 			t.Errorf("Expected first storage status = active, got %s", storage[0].Status)
 		}
+		if storage[0].SnapshotKey != "sha256:abc" {
+			t.Errorf("Expected first storage snapshot key = sha256:abc, got %s", storage[0].SnapshotKey)
+		}
 
 		// Verify second storage entry
 		if storage[1].ContentID != "content-456" {
@@ -152,6 +157,9 @@ func TestTableFormatter_DataValidation(t *testing.T) {
 		}
 		if storage[1].Status != "removed" {
 			t.Errorf("Expected second storage status = removed, got %s", storage[1].Status)
+		}
+		if storage[1].SnapshotKey != "" {
+			t.Errorf("Expected second storage snapshot key to be empty, got %s", storage[1].SnapshotKey)
 		}
 	})
 }

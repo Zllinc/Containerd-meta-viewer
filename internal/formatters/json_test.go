@@ -152,16 +152,18 @@ func TestJSONFormatter_FormatDevboxStorage(t *testing.T) {
 
 	storage := []database.DevboxStorageInfo{
 		{
-			ContentID: "content-123",
-			LvName:    "lv-test-1",
-			Path:      "/mount/path/1",
-			Status:    "active",
+			ContentID:   "content-123",
+			SnapshotKey: "sha256:abc",
+			LvName:      "lv-test-1",
+			Path:        "/mount/path/1",
+			Status:      "active",
 		},
 		{
-			ContentID: "content-456",
-			LvName:    "",
-			Path:      "/mount/path/2",
-			Status:    "removed",
+			ContentID:   "content-456",
+			SnapshotKey: "",
+			LvName:      "",
+			Path:        "/mount/path/2",
+			Status:      "removed",
 		},
 	}
 
@@ -176,6 +178,7 @@ func TestJSONFormatter_FormatDevboxStorage(t *testing.T) {
 	expectedFields := []string{
 		`"content_id": "content-123"`,
 		`"content_id": "content-456"`,
+		`"snapshot_key": "sha256:abc"`,
 		`"lv_name": "lv-test-1"`,
 		`"lv_name": ""`,
 		`"path": "/mount/path/1"`,
@@ -195,10 +198,11 @@ func TestJSONFormatter_FormatDevboxStorageItem(t *testing.T) {
 	_ = NewJSONFormatter(false) // Test creation
 
 	item := &database.DevboxStorageInfo{
-		ContentID: "test-content-id",
-		LvName:    "lv-test-volume",
-		Path:      "/test/mount/path",
-		Status:    "active",
+		ContentID:   "test-content-id",
+		SnapshotKey: "sha256:test",
+		LvName:      "lv-test-volume",
+		Path:        "/test/mount/path",
+		Status:      "active",
 	}
 
 	// Test marshaling directly
@@ -211,6 +215,7 @@ func TestJSONFormatter_FormatDevboxStorageItem(t *testing.T) {
 
 	expectedFields := []string{
 		`"content_id":"test-content-id"`, // No space in compact JSON
+		`"snapshot_key":"sha256:test"`,
 		`"lv_name":"lv-test-volume"`,
 		`"path":"/test/mount/path"`,
 		`"status":"active"`,
@@ -288,7 +293,7 @@ func TestJSONFormatter_ToJSON(t *testing.T) {
 		_ = NewJSONFormatter(false) // Test creation
 
 		testData := map[string]interface{}{
-			"name": "test",
+			"name":  "test",
 			"value": 42,
 		}
 
@@ -311,7 +316,7 @@ func TestJSONFormatter_ToJSON(t *testing.T) {
 		_ = NewJSONFormatter(true) // Test creation
 
 		testData := map[string]interface{}{
-			"name": "test",
+			"name":  "test",
 			"value": 42,
 		}
 

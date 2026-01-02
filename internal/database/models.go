@@ -40,6 +40,15 @@ type BucketInfo struct {
 	KeyCount int    `json:"key_count"`
 }
 
+// GhostChildInfo represents a parent link that points to a non-existent child snapshot
+type GhostChildInfo struct {
+	ParentKey   string `json:"parent_key"`   // The snapshot key that has ghost children
+	ParentID    uint64 `json:"parent_id"`    // The snapshot ID
+	ChildKey    string `json:"child_key"`    // The child key stored in parents bucket (may not exist)
+	ChildID     uint64 `json:"child_id"`     // The child ID from the parent link
+	ChildExists bool   `json:"child_exists"` // Whether the child snapshot actually exists
+}
+
 // SnapshotKindString converts snapshot kind to human readable string
 func SnapshotKindString(kind snapshots.Kind) string {
 	switch kind {

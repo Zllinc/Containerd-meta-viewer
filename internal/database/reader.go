@@ -1,6 +1,7 @@
 package database
 
 import (
+	"encoding/binary"
 	"fmt"
 	"io"
 	"os"
@@ -375,4 +376,264 @@ func (r *MetaReader) readDevboxStorageInfo(contentID string, bkt *bolt.Bucket) (
 	}
 
 	return info, nil
+}
+
+// FindGhostChildren finds parent links in the "parents" bucket that point to
+// non-existent child snapshots. This can happen when a child snapshot is deleted
+// but the parent link is not cleaned up properly (a bug in the snapshotter).
+func (r *MetaReader) FindGhostChildren() ([]GhostChildInfo, error) {
+	var ghosts []GhostChildInfo
+
+	err := r.db.View(func(tx *bolt.Tx) error {
+		v1Bkt := tx.Bucket(bucketKeyStorageVersion)
+		if v1Bkt == nil {
+			return fmt.Errorf("v1 bucket not found")
+		}
+
+		snapshotsBkt := v1Bkt.Bucket(bucketKeySnapshot)
+		if snapshotsBkt == nil {
+			return fmt.Errorf("snapshots bucket not found")
+		}
+
+		parentsBkt := v1Bkt.Bucket(bucketKeyParents)
+		if parentsBkt == nil {
+			// No parents bucket means no parent-child relationships
+			return nil
+		}
+
+		// Build a map of snapshot key -> ID for quick lookup
+		snapshotKeyToID := make(map[string]uint64)
+		snapshotIDToKey := make(map[uint64]string)
+
+		err := snapshotsBkt.ForEach(func(k, v []byte) error {
+			if v != nil { // skip non-buckets
+				return nil
+			}
+			sbkt := snapshotsBkt.Bucket(k)
+			if sbkt == nil {
+				return nil
+			}
+			idData := sbkt.Get(bucketKeyID)
+			if idData != nil {
+				id := readID(idData)
+				key := string(k)
+				snapshotKeyToID[key] = id
+				snapshotIDToKey[id] = key
+			}
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+
+		// Iterate through parents bucket to find ghost children
+		// The parents bucket stores entries like: parentKey(parentID, childID) -> childKey
+		return parentsBkt.ForEach(func(k, v []byte) error {
+			// Parse the composite key to get parentID and childID
+			parentID, n := binary.Uvarint(k)
+			if n <= 0 {
+				return nil // invalid key format
+			}
+			// Skip the separator byte
+			childID, n := binary.Uvarint(k[n+1:])
+			if n <= 0 {
+				return nil // invalid key format
+			}
+
+			childKey := string(v)
+
+			// Check if child snapshot exists
+			childExists := false
+			if _, exists := snapshotKeyToID[childKey]; exists {
+				childExists = true
+			}
+
+			// Get parent key
+			parentKey := snapshotIDToKey[parentID]
+
+			if !childExists {
+				ghosts = append(ghosts, GhostChildInfo{
+					ParentKey:   parentKey,
+					ParentID:    parentID,
+					ChildKey:    childKey,
+					ChildID:     childID,
+					ChildExists: childExists,
+				})
+			}
+
+			return nil
+		})
+	})
+
+	return ghosts, err
+}
+
+// ChildInfo represents a child reference in the parents bucket
+type ChildInfo struct {
+	ParentKey   string `json:"parent_key"`
+	ParentID    uint64 `json:"parent_id"`
+	ChildKey    string `json:"child_key"`
+	ChildID     uint64 `json:"child_id"`
+	ChildExists bool   `json:"child_exists"`
+}
+
+// FindChildrenByParentID finds all children references for a specific parent ID
+func (r *MetaReader) FindChildrenByParentID(parentID uint64) ([]ChildInfo, error) {
+	var children []ChildInfo
+
+	err := r.db.View(func(tx *bolt.Tx) error {
+		v1Bkt := tx.Bucket(bucketKeyStorageVersion)
+		if v1Bkt == nil {
+			return fmt.Errorf("v1 bucket not found")
+		}
+
+		snapshotsBkt := v1Bkt.Bucket(bucketKeySnapshot)
+		if snapshotsBkt == nil {
+			return fmt.Errorf("snapshots bucket not found")
+		}
+
+		parentsBkt := v1Bkt.Bucket(bucketKeyParents)
+		if parentsBkt == nil {
+			return nil
+		}
+
+		// Build a map of snapshot key -> ID for quick lookup
+		snapshotKeyToID := make(map[string]uint64)
+		snapshotIDToKey := make(map[uint64]string)
+
+		err := snapshotsBkt.ForEach(func(k, v []byte) error {
+			if v != nil {
+				return nil
+			}
+			sbkt := snapshotsBkt.Bucket(k)
+			if sbkt == nil {
+				return nil
+			}
+			idData := sbkt.Get(bucketKeyID)
+			if idData != nil {
+				id := readID(idData)
+				key := string(k)
+				snapshotKeyToID[key] = id
+				snapshotIDToKey[id] = key
+			}
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+
+		parentKey := snapshotIDToKey[parentID]
+
+		// Iterate through parents bucket to find children of this parent
+		return parentsBkt.ForEach(func(k, v []byte) error {
+			pID, n := binary.Uvarint(k)
+			if n <= 0 {
+				return nil
+			}
+			if pID != parentID {
+				return nil
+			}
+
+			childID, n := binary.Uvarint(k[n+1:])
+			if n <= 0 {
+				return nil
+			}
+
+			childKey := string(v)
+			_, childExists := snapshotKeyToID[childKey]
+
+			children = append(children, ChildInfo{
+				ParentKey:   parentKey,
+				ParentID:    parentID,
+				ChildKey:    childKey,
+				ChildID:     childID,
+				ChildExists: childExists,
+			})
+
+			return nil
+		})
+	})
+
+	return children, err
+}
+
+// DumpAllParentLinks returns all parent-child links in the parents bucket
+func (r *MetaReader) DumpAllParentLinks() ([]ChildInfo, error) {
+	var allLinks []ChildInfo
+
+	err := r.db.View(func(tx *bolt.Tx) error {
+		v1Bkt := tx.Bucket(bucketKeyStorageVersion)
+		if v1Bkt == nil {
+			return fmt.Errorf("v1 bucket not found")
+		}
+
+		snapshotsBkt := v1Bkt.Bucket(bucketKeySnapshot)
+		if snapshotsBkt == nil {
+			return fmt.Errorf("snapshots bucket not found")
+		}
+
+		parentsBkt := v1Bkt.Bucket(bucketKeyParents)
+		if parentsBkt == nil {
+			return nil
+		}
+
+		// Build a map of snapshot key -> ID for quick lookup
+		snapshotKeyToID := make(map[string]uint64)
+		snapshotIDToKey := make(map[uint64]string)
+
+		err := snapshotsBkt.ForEach(func(k, v []byte) error {
+			if v != nil {
+				return nil
+			}
+			sbkt := snapshotsBkt.Bucket(k)
+			if sbkt == nil {
+				return nil
+			}
+			idData := sbkt.Get(bucketKeyID)
+			if idData != nil {
+				id := readID(idData)
+				key := string(k)
+				snapshotKeyToID[key] = id
+				snapshotIDToKey[id] = key
+			}
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+
+		// Iterate through all parents bucket entries
+		return parentsBkt.ForEach(func(k, v []byte) error {
+			pID, n := binary.Uvarint(k)
+			if n <= 0 {
+				return nil
+			}
+
+			childID, n := binary.Uvarint(k[n+1:])
+			if n <= 0 {
+				return nil
+			}
+
+			childKey := string(v)
+			_, childExists := snapshotKeyToID[childKey]
+
+			allLinks = append(allLinks, ChildInfo{
+				ParentKey:   snapshotIDToKey[pID],
+				ParentID:    pID,
+				ChildKey:    childKey,
+				ChildID:     childID,
+				ChildExists: childExists,
+			})
+
+			return nil
+		})
+	})
+
+	return allLinks, err
+}
+
+// readID reads a uint64 ID from bytes
+func readID(data []byte) uint64 {
+	id, _ := binary.Uvarint(data)
+	return id
 }

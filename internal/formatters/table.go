@@ -49,10 +49,10 @@ func (f *TableFormatter) FormatSnapshots(snapshots []database.SnapshotInfo) erro
 
 		fmt.Fprintf(f.writer, "%d\t%s\t%s\t%s\t%s\t%s\t%d\t%d\t%s\n",
 			snapshot.ID,
-			truncateString(snapshot.Key, 12),
+			snapshot.Key,
 			database.SnapshotKindString(snapshot.Kind),
 			parent,
-			truncateString(contentID, 12),
+			contentID,
 			truncateString(path, 20),
 			snapshot.Inodes,
 			snapshot.Size,

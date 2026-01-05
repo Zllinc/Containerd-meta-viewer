@@ -27,16 +27,26 @@ type SnapshotInfo struct {
 
 // DevboxStorageInfo represents devbox-specific storage metadata
 type DevboxStorageInfo struct {
-	ContentID string `json:"content_id"`
-	LvName    string `json:"lv_name"`
-	Path      string `json:"path"`
-	Status    string `json:"status"`
+	ContentID   string `json:"content_id"`
+	LvName      string `json:"lv_name"`
+	Path        string `json:"path"`
+	Status      string `json:"status"`
+	SnapshotKey string `json:"snapshot_key,omitempty"`
 }
 
 // BucketInfo represents basic information about a bolt bucket
 type BucketInfo struct {
 	Name     string `json:"name"`
 	KeyCount int    `json:"key_count"`
+}
+
+// GhostChildInfo represents a parent link that points to a non-existent child snapshot
+type GhostChildInfo struct {
+	ParentKey   string `json:"parent_key"`   // The snapshot key that has ghost children
+	ParentID    uint64 `json:"parent_id"`    // The snapshot ID
+	ChildKey    string `json:"child_key"`    // The child key stored in parents bucket (may not exist)
+	ChildID     uint64 `json:"child_id"`     // The child ID from the parent link
+	ChildExists bool   `json:"child_exists"` // Whether the child snapshot actually exists
 }
 
 // SnapshotKindString converts snapshot kind to human readable string

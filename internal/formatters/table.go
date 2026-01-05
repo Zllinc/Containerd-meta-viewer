@@ -49,10 +49,10 @@ func (f *TableFormatter) FormatSnapshots(snapshots []database.SnapshotInfo) erro
 
 		fmt.Fprintf(f.writer, "%d\t%s\t%s\t%s\t%s\t%s\t%d\t%d\t%s\n",
 			snapshot.ID,
-			truncateString(snapshot.Key, 12),
+			snapshot.Key,
 			database.SnapshotKindString(snapshot.Kind),
 			parent,
-			truncateString(contentID, 12),
+			contentID,
 			truncateString(path, 20),
 			snapshot.Inodes,
 			snapshot.Size,
@@ -94,7 +94,7 @@ func (f *TableFormatter) FormatSnapshot(snapshot *database.SnapshotInfo) error {
 
 // FormatDevboxStorage formats devbox storage information as a table
 func (f *TableFormatter) FormatDevboxStorage(storage []database.DevboxStorageInfo) error {
-	fmt.Fprintln(f.writer, "CONTENT_ID\tLV_NAME\tPATH\tSTATUS")
+	fmt.Fprintln(f.writer, "CONTENT_ID\tSNAPSHOT_KEY\tLV_NAME\tPATH\tSTATUS")
 	for _, item := range storage {
 		lvName := item.LvName
 		if lvName == "" {
@@ -108,9 +108,14 @@ func (f *TableFormatter) FormatDevboxStorage(storage []database.DevboxStorageInf
 		if status == "" {
 			status = "unknown"
 		}
+		snapshotKey := item.SnapshotKey
+		if snapshotKey == "" {
+			snapshotKey = "-"
+		}
 
-		fmt.Fprintf(f.writer, "%s\t%s\t%s\t%s\n",
-			truncateString(item.ContentID, 12),
+		fmt.Fprintf(f.writer, "%s\t%s\t%s\t%s\t%s\n",
+			item.ContentID,
+			truncateString(snapshotKey, 16),
 			lvName,
 			truncateString(path, 30),
 			status)
@@ -123,6 +128,9 @@ func (f *TableFormatter) FormatDevboxStorageItem(item *database.DevboxStorageInf
 	fmt.Printf("Devbox Storage Information:\n")
 	fmt.Printf("==========================\n")
 	fmt.Printf("ContentID: %s\n", item.ContentID)
+	if item.SnapshotKey != "" {
+		fmt.Printf("Snapshot Key: %s\n", item.SnapshotKey)
+	}
 	fmt.Printf("LV Name:   %s\n", item.LvName)
 	fmt.Printf("Path:      %s\n", item.Path)
 	fmt.Printf("Status:    %s\n", item.Status)

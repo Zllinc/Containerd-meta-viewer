@@ -148,7 +148,11 @@ type BucketInfo struct {
 
 ### DevboxStorageInfo
 
-包含 devbox 存储信息：内容 ID、LVM 卷名、路径、状态等。
+包含 devbox 存储信息：内容 ID、关联的 snapshot key、LVM 卷名、路径、状态等。
+
+### ClearDevboxSnapshotKey
+
+提供 `ClearDevboxSnapshotKey(dbPath, contentID string)` 辅助方法，用于在 devbox storage bucket 中清除指定 content ID 的 `snapshot_key` 字段，解决残留的快照引用。该方法会以读写模式打开 BoltDB，因此在调用前需要确保数据库未被 containerd 占用。
 
 ## 使用示例
 

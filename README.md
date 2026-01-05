@@ -1,327 +1,351 @@
 # Containerd Meta Viewer
 
-一个用于查看 containerd snapshotter 元数据的 CLI 工具。该工具允许用户查看存储在 bolt 数据库中的快照、存储信息和 LVM 映射。
+一个用于查看和管理 containerd snapshotter 元数据的 CLI 工具。该工具允许用户查看存储在 bolt 数据库中的快照、存储信息和 LVM 映射，并提供清理孤儿快照、分析依赖关系等功能。
 
 ## 功能特性
 
+### 核心功能
 - 查看数据库中的所有 buckets
 - 列出和搜索快照信息
 - 查看 containerd 特定的存储信息
 - 显示 LVM 卷名到挂载路径的映射
 - 支持表格和 JSON 两种输出格式
-- 提供详细和简洁的输出模式
+
+### 快照管理
+- **孤儿检测**: 检测 metadata.db 中存在但 containerd 中不存在的快照
+- **未使用检测**: 检测没有被任何容器使用的快照
+- **安全清理**: 多重检查确保安全删除快照
+- **依赖分析**: 分析快照被多少容器直接或间接依赖
+
+### Containerd Core 管理
+- **Ghost Children 检测**: 检测 containerd core 中存在但快照已删除的残留引用
+- **Ghost Children 清理**: 清理 containerd core 中的残留引用
 
 ## 安装
 
 ### 从源码构建
 
 ```bash
-# 克隆项目
 git clone <repository-url>
 cd containerd-meta-viewer
-
-# 下载依赖
 go mod tidy
-
-# 构建可执行文件
 go build -o containerd-meta-viewer .
-
-# 移动到系统路径（可选）
 sudo mv containerd-meta-viewer /usr/local/bin/
 ```
 
-## 使用方法
+## 全局参数
 
-### 全局参数
+- `--db-path, -p`: containerd metadata.db 文件路径（默认 `/var/lib/containerd/io.containerd.snapshotter.v1.devbox/metadata.db`）
+- `--output, -o`: 输出格式 `table`（默认）或 `json`
+- `--verbose, -v`: 启用详细输出
 
-- `--db-path, -p`: containerd metadata.db 文件路径（可选，默认为 `/var/lib/containerd/io.containerd.snapshotter.v1.devbox/metadata.db`）
-- `--output, -o`: 输出格式，支持 `table`（默认）和 `json`
-- `--verbose, -v`: 启用详细输出（仅在 JSON 格式下有效）
+---
 
-### 基本用法
+## 命令参考
 
-现在工具会自动使用默认的数据库路径，您可以直接运行命令：
-
-```bash
-# 使用默认数据库路径
-containerd-meta-viewer <command>
-
-# 或者指定自定义数据库路径
-containerd-meta-viewer --db-path /path/to/custom/metadata.db <command>
-```
-
-默认数据库路径：`/var/lib/containerd/io.containerd.snapshotter.v1.devbox/metadata.db`
-
-### 命令参考
-
-#### 1. 查看数据库 Buckets
-
-列出数据库中的所有顶级 buckets：
+### 1. 查看数据库 Buckets
 
 ```bash
-# 使用默认数据库路径
 containerd-meta-viewer buckets
-
-# 或者指定自定义路径
-containerd-meta-viewer --db-path /path/to/metadata.db buckets
 ```
 
-输出示例：
-```
-NAME    KEYS
-v1      1
-```
+---
 
-#### 2. 快照管理
+### 2. 快照管理 (snapshots)
 
-##### 列出所有快照
+#### 列出所有快照
 
 ```bash
-containerd-meta-viewer --db-path /path/to/metadata.db snapshots list
+containerd-meta-viewer snapshots list
 ```
 
-输出示例：
-```
-ID    KEY            KIND       PARENT    CONTENT_ID    PATH                    INODES    SIZE    CREATED
-1     sha256:abc...  active     -         abc123        /var/lib/containerd/...  1000      1024    2024-01-01 10:00:00
-2     sha256:def...  committed  sha256:abc def456        /var/lib/containerd/...  1500      2048    2024-01-01 11:00:00
-```
-
-##### 查看特定快照详情
+#### 查看特定快照详情
 
 ```bash
-containerd-meta-viewer --db-path /path/to/metadata.db snapshots get <snapshot-key>
+containerd-meta-viewer snapshots get <snapshot-key>
 ```
 
-输出示例：
-```
-Snapshot Information:
-====================
-ID:       1
-Key:      sha256:abcdef123456...
-Kind:     active
-Parent:   -
-Created:  2024-01-01 10:00:00
-Updated:  2024-01-01 10:00:00
-Inodes:   1000
-Size:     1024 bytes
-ContentID: abc123
-Path:      /var/lib/containerd/devbox/mounts/abc123
-
-Labels:
-  key1: value1
-  key2: value2
-```
-
-##### 搜索快照
-
-按内容 ID 或挂载路径搜索快照：
+#### 搜索快照
 
 ```bash
 # 按内容 ID 搜索
-containerd-meta-viewer --db-path /path/to/metadata.db snapshots search --content-id abc123
+containerd-meta-viewer snapshots search --content-id abc123
 
 # 按路径搜索
-containerd-meta-viewer --db-path /path/to/metadata.db snapshots search --path /var/lib/containerd/devbox/mounts/abc123
-
-# 同时按多个条件搜索
-containerd-meta-viewer --db-path /path/to/metadata.db snapshots search --content-id abc123 --path /var/lib/containerd/devbox/mounts/abc123
+containerd-meta-viewer snapshots search --path /var/lib/containerd/devbox/mounts/abc123
 ```
 
-#### 3. Devbox 存储管理
-
-##### 列出所有 Devbox 存储条目
+#### 查看快照父链
 
 ```bash
-containerd-meta-viewer --db-path /path/to/metadata.db devbox list
+containerd-meta-viewer snapshots parents <snapshot-key>
 ```
 
-输出示例：
-```
-CONTENT_ID    LV_NAME            PATH                            STATUS
-abc123        lv-devbox-abc123   /var/lib/containerd/devbox/...  active
-def456        lv-devbox-def456   /var/lib/containerd/devbox/...  active
-```
-
-##### 查看特定 Devbox 存储条目
+#### 查看快照子链
 
 ```bash
-containerd-meta-viewer --db-path /path/to/metadata.db devbox get <content-id>
+containerd-meta-viewer snapshots children <snapshot-key>
 ```
 
-输出示例：
-```
-Devbox Storage Information:
-==========================
-ContentID: abc123
-LV Name:   lv-devbox-abc123
-Path:      /var/lib/containerd/devbox/mounts/abc123
-Status:    active
-```
+---
 
-##### 查看 LVM 映射
+### 3. 孤儿快照检测与清理 (orphan)
 
-显示 LVM 卷名到挂载路径的映射关系：
+检测在 metadata.db 中存在但在 containerd 中不存在的快照。
 
 ```bash
-containerd-meta-viewer --db-path /path/to/metadata.db devbox lvm-map
+# 检测孤儿快照
+containerd-meta-viewer snapshots orphan --namespace k8s.io
+
+# 导出到文件
+containerd-meta-viewer snapshots orphan --namespace k8s.io --export /tmp/orphans.json
+
+# 清理孤儿快照
+containerd-meta-viewer snapshots cleanup --namespace k8s.io --file /tmp/orphans.json
 ```
 
-输出示例：
-```
-LV_NAME            PATH
-lv-devbox-abc123   /var/lib/containerd/devbox/mounts/abc123
-lv-devbox-def456   /var/lib/containerd/devbox/mounts/def456
-```
+---
 
-### 输出格式
+### 4. 未使用快照检测 (unused)
 
-#### 表格格式（默认）
+检测没有被其他快照引用为 parent 且不是 Active 状态的快照。
 
 ```bash
-containerd-meta-viewer --db-path /path/to/metadata.db snapshots list
+# 列出未使用的快照
+containerd-meta-viewer snapshots unused --namespace k8s.io
+
+# 导出到文件
+containerd-meta-viewer snapshots unused --namespace k8s.io --export /tmp/unused.json
 ```
 
-#### JSON 格式
+---
+
+### 5. 安全未使用快照检测 (safe-unused)
+
+进行多重安全检查，确保快照真正可以安全删除。
+
+**检查项目：**
+1. **Kind 检查**: 不是 Active 状态
+2. **Parent 检查**: 没有被其他快照引用为 parent
+3. **Container 检查**: 没有被任何容器使用
+4. **Mount 检查**: 没有被挂载
 
 ```bash
-# 紧凑 JSON
-containerd-meta-viewer --db-path /path/to/metadata.db snapshots list --output json
+# 列出所有快照的安全检查结果
+containerd-meta-viewer snapshots safe-unused --namespace k8s.io
 
-# 格式化 JSON
-containerd-meta-viewer --db-path /path/to/metadata.db snapshots list --output json --verbose
+# 只显示安全可删除的快照
+containerd-meta-viewer snapshots safe-unused --namespace k8s.io --only-safe
+
+# 导出安全快照到文件
+containerd-meta-viewer snapshots safe-unused --namespace k8s.io --export /tmp/safe.json --only-safe
 ```
 
-JSON 输出示例：
-```json
-[
-  {
-    "key": "sha256:abcdef123456...",
-    "id": 1,
-    "kind": "active",
-    "parent": "",
-    "created_at": "2024-01-01T10:00:00Z",
-    "updated_at": "2024-01-01T10:00:00Z",
-    "labels": {
-      "key1": "value1"
-    },
-    "inodes": 1000,
-    "size": 1024,
-    "content_id": "abc123",
-    "path": "/var/lib/containerd/devbox/mounts/abc123"
-  }
-]
-```
+---
 
-### 常见使用场景
+### 6. 安全清理 (safe-cleanup)
 
-#### 1. 调试挂载问题
-
-当容器挂载出现问题时，可以查看快照和对应的存储信息：
+根据导出的文件来安全删除快照。
 
 ```bash
-# 查看所有快照
-containerd-meta-viewer --db-path /path/to/metadata.db snapshots list
+# 预览删除（dry-run）
+containerd-meta-viewer snapshots safe-cleanup --namespace k8s.io --file /tmp/safe.json --dry-run
 
-# 查看特定快照的详情
-containerd-meta-viewer --db-path /path/to/metadata.db snapshots get <problematic-snapshot-key>
-
-# 查看对应的 devbox 存储信息
-containerd-meta-viewer --db-path /path/to/metadata.db devbox get <content-id>
+# 实际删除
+containerd-meta-viewer snapshots safe-cleanup --namespace k8s.io --file /tmp/safe.json
 ```
 
-#### 2. 检查 LVM 状态
+---
 
-查看 LVM 卷的映射关系和状态：
+### 7. 快照依赖分析 (deps)
+
+分析每个快照被多少容器直接或间接依赖。
 
 ```bash
+# 基本分析
+containerd-meta-viewer snapshots deps --namespace k8s.io
+
+# 按容器数量分组显示
+containerd-meta-viewer snapshots deps --namespace k8s.io --group-by count
+
+# 按层级深度分组显示
+containerd-meta-viewer snapshots deps --namespace k8s.io --group-by depth
+
+# 只显示被至少 5 个容器使用的快照
+containerd-meta-viewer snapshots deps --namespace k8s.io --min-count 5
+```
+
+**输出示例：**
+```
+=== Summary ===
+Total snapshots: 2000
+  Unused (0 containers):       100
+  Direct container usage:      50
+  Indirect only (base layers): 1850
+  Max containers per snapshot: 45
+
+=== Distribution by Container Count ===
+Container Count      Snapshot Count
+---------------      ---------------
+0                    100        ██████████
+1                    50         █████
+5                    200        ████████████████████
+```
+
+---
+
+### 8. Ghost 检测与清理 (ghost)
+
+检测 devbox metadata.db 中的 ghost 引用。
+
+```bash
+# 检测 ghost
+containerd-meta-viewer snapshots ghost --namespace k8s.io
+
+# 预览清理
+containerd-meta-viewer snapshots ghost-cleanup --dry-run
+
+# 实际清理
+containerd-meta-viewer snapshots ghost-cleanup
+```
+
+---
+
+### 9. Devbox 存储管理 (devbox)
+
+```bash
+# 列出所有条目
+containerd-meta-viewer devbox list
+
+# 查看特定条目
+containerd-meta-viewer devbox get <content-id>
+
 # 查看 LVM 映射
-containerd-meta-viewer --db-path /path/to/metadata.db devbox lvm-map
+containerd-meta-viewer devbox lvm-map
 
-# 查看所有 devbox 存储条目状态
-containerd-meta-viewer --db-path /path/to/metadata.db devbox list
+# 清除 snapshot key
+containerd-meta-viewer devbox remove_key <content-id>
 ```
 
-#### 3. 数据分析
+---
 
-使用 JSON 输出进行数据分析：
+### 10. Containerd Core 管理 (containerd)
+
+用于检查和管理 containerd core 的 `meta.db` 数据库（路径：`/var/lib/containerd/io.containerd.metadata.v1.bolt/meta.db`）。
 
 ```bash
-# 导出所有快照数据为 JSON
-containerd-meta-viewer --db-path /path/to/metadata.db snapshots list --output json > snapshots.json
+# 列出 Buckets
+containerd-meta-viewer containerd buckets
 
-# 导出所有 devbox 存储数据为 JSON
-containerd-meta-viewer --db-path /path/to/metadata.db devbox list --output json > devbox-storage.json
+# 列出命名空间
+containerd-meta-viewer containerd namespaces
+
+# 列出快照
+containerd-meta-viewer containerd snapshots --namespace k8s.io
+
+# 查看快照详情
+containerd-meta-viewer containerd get --namespace k8s.io <snapshot-key>
+
+# 查看快照 Children
+containerd-meta-viewer containerd children --namespace k8s.io <snapshot-key>
+
+# 检测 Ghost Children
+containerd-meta-viewer containerd ghost --namespace k8s.io
+
+# 清理 Ghost Children（预览）
+containerd-meta-viewer containerd ghost-cleanup --namespace k8s.io --dry-run
+
+# 清理 Ghost Children（实际）
+containerd-meta-viewer containerd ghost-cleanup --namespace k8s.io
+
+# 导出结构
+containerd-meta-viewer containerd dump
 ```
 
-## 故障排除
+---
 
-### 常见错误
+## 常见使用场景
 
-1. **"failed to open bolt database"**
-   - 检查数据库文件是否存在（默认路径：`/var/lib/containerd/io.containerd.snapshotter.v1.devbox/metadata.db`）
-   - 确保有读取该文件的权限
-   - 如果默认路径不存在，使用 `--db-path` 指定正确的路径
-   - **数据库被锁定处理**：如果数据库被 containerd 进程锁定，工具会自动复制数据库到临时文件进行读取，无需手动操作
+### 场景 1: 清理泄露的快照
 
-2. **"v1 bucket not found"**
-   - 数据库可能为空或损坏
-   - 确认这是正确的 devbox metadata.db 文件
+```bash
+# 1. 先清理 containerd core 中的 ghost children
+containerd-meta-viewer containerd ghost --namespace k8s.io
+containerd-meta-viewer containerd ghost-cleanup --namespace k8s.io --dry-run
+containerd-meta-viewer containerd ghost-cleanup --namespace k8s.io
 
-3. **权限被拒绝**
-   - 确保当前用户有读取数据库文件的权限
-   - 可能需要使用 `sudo` 运行命令
+# 2. 检测并清理未使用的快照
+containerd-meta-viewer snapshots unused --namespace k8s.io --export /tmp/unused.json
+containerd-meta-viewer snapshots safe-cleanup --namespace k8s.io --file /tmp/unused.json --dry-run
+containerd-meta-viewer snapshots safe-cleanup --namespace k8s.io --file /tmp/unused.json
+```
 
-4. **数据库被锁定**
-   - **自动处理**：工具会自动检测数据库锁定状态，如果被 containerd 进程锁定，会自动复制数据库到临时位置进行读取
-   - 读取完成后会自动清理临时文件
-   - 这是自动化过程，用户无需担心
-   - 如果遇到临时文件相关的错误，可以手动清理 `/tmp/containerd-meta-viewer-*.db` 文件
+### 场景 2: 分析快照使用情况
 
-### 调试技巧
+```bash
+containerd-meta-viewer snapshots deps --namespace k8s.io
+containerd-meta-viewer snapshots deps --namespace k8s.io --group-by count --min-count 10
+```
 
-1. **使用 JSON 输出获取详细信息**
-   ```bash
-   containerd-meta-viewer --db-path /path/to/metadata.db buckets --output json --verbose
-   ```
+### 场景 3: 调试删除失败 (cannot remove snapshot with child)
 
-2. **检查数据库结构**
-   ```bash
-   containerd-meta-viewer --db-path /path/to/metadata.db buckets
-   ```
+```bash
+# 1. 检查 ghost children
+containerd-meta-viewer containerd children --namespace k8s.io <snapshot-key>
 
-3. **验证数据库文件**
-   - 确认文件大小合理（不为 0）
-   - 确认文件权限可读
+# 2. 清理 ghost children
+containerd-meta-viewer containerd ghost-cleanup --namespace k8s.io
 
-## 数据库结构说明
+# 3. 重试删除
+ctr -n k8s.io snapshots --snapshotter devbox rm <snapshot-key>
+```
 
-DevBox snapshotter 使用以下 BoltDB 结构：
+### 场景 4: 追溯快照来源
+
+```bash
+containerd-meta-viewer snapshots parents sha256:abc123...
+containerd-meta-viewer snapshots children sha256:abc123...
+```
+
+---
+
+## 数据库结构
+
+### DevBox Snapshotter (metadata.db)
 
 ```
 v1/
-├── snapshots/           # 标准containerd快照
-│   └── <snapshot-key>   # 每个快照的bucket
-│       ├── id           # 快照ID
-│       ├── kind         # 快照类型(active/view/committed)
-│       ├── parent       # 父快照
-│       ├── inodes       # inode数量
-│       ├── size         # 大小
-│       ├── labels       # 标签
-│       ├── content_id   # devbox特定: 内容ID
-│       └── path         # devbox特定: 挂载路径
-├── parents/            # 父子关系映射
-└── devbox_storage_path/ # devbox特定bucket
-    └── <content-id>    # 按contentID组织
-        ├── lv_name     # LVM卷名
-        ├── path        # 挂载路径
-        └── status      # 状态(active/removed)
+├── snapshots/           # 快照信息
+├── parents/             # 父子关系 (child → parent)
+└── devbox_storage_path/ # devbox 存储
 ```
+
+### Containerd Core (meta.db)
+
+```
+v1/
+└── <namespace>/
+    └── snapshots/
+        └── <snapshotter>/
+            ├── <snapshot-key>
+            └── children/
+                └── <parent-key> → [child-keys]
+```
+
+---
+
+## 故障排除
+
+1. **"failed to open bolt database"** - 检查文件是否存在和权限，数据库被锁定时工具会自动复制到临时文件
+2. **"cannot remove snapshot with child"** - 使用 `containerd ghost-cleanup` 清理残留引用
+3. **权限被拒绝** - 使用 `sudo` 运行
+
+---
 
 ## 贡献
 
-欢迎提交 Issue 和 Pull Request。请参考 [DEVELOPMENT.md](DEVELOPMENT.md) 了解开发规范。
+欢迎提交 Issue 和 Pull Request。请参考 [doc/DEVELOPMENT.md](doc/DEVELOPMENT.md) 了解开发规范。
 
 ## 许可证
 
-本项目使用 Apache License 2.0 许可证。
+Apache License 2.0

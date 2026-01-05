@@ -45,6 +45,16 @@ This is useful for understanding which LVM volumes are mounted where.`,
 	RunE: runDevboxLvmMap,
 }
 
+// devboxRemoveKeyCmd clears the snapshot key mapping for a content ID
+var devboxRemoveKeyCmd = &cobra.Command{
+	Use:   "remove_key [content-id]",
+	Short: "Clear the snapshot key reference for a devbox storage entry",
+	Long: `Clear the snapshot_key field for the specified devbox content ID.
+This is useful when the snapshot reference is stale or needs to be reset.`,
+	Args: cobra.ExactArgs(1),
+	RunE: runDevboxRemoveKey,
+}
+
 func runDevboxList(cmd *cobra.Command, args []string) error {
 	reader, err := database.NewMetaReader(dbPath)
 	if err != nil {
@@ -110,9 +120,21 @@ func runDevboxLvmMap(cmd *cobra.Command, args []string) error {
 	}
 }
 
+func runDevboxRemoveKey(cmd *cobra.Command, args []string) error {
+	contentID := args[0]
+
+	if err := database.ClearDevboxSnapshotKey(dbPath, contentID); err != nil {
+		return fmt.Errorf("failed to clear snapshot key for %s: %w", contentID, err)
+	}
+
+	fmt.Printf("Cleared snapshot key for content ID %s\n", contentID)
+	return nil
+}
+
 func init() {
 	rootCmd.AddCommand(devboxCmd)
 	devboxCmd.AddCommand(devboxListCmd)
 	devboxCmd.AddCommand(devboxGetCmd)
 	devboxCmd.AddCommand(devboxLvmMapCmd)
+	devboxCmd.AddCommand(devboxRemoveKeyCmd)
 }

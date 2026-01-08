@@ -31,29 +31,19 @@ func (f *TableFormatter) FormatBuckets(buckets []database.BucketInfo) error {
 
 // FormatSnapshots formats snapshot information as a table
 func (f *TableFormatter) FormatSnapshots(snapshots []database.SnapshotInfo) error {
-	fmt.Fprintln(f.writer, "ID\tKEY\tKIND\tPARENT\tCONTENT_ID\tPATH\tINODES\tSIZE\tCREATED")
+	fmt.Fprintln(f.writer, "ID\tKEY\tKIND\tPARENT\tINODES\tSIZE\tCREATED")
 	for _, snapshot := range snapshots {
 		created := snapshot.CreatedAt.Format("2006-01-02 15:04:05")
 		parent := snapshot.Parent
 		if parent == "" {
 			parent = "-"
 		}
-		contentID := snapshot.ContentID
-		if contentID == "" {
-			contentID = "-"
-		}
-		path := snapshot.Path
-		if path == "" {
-			path = "-"
-		}
 
-		fmt.Fprintf(f.writer, "%d\t%s\t%s\t%s\t%s\t%s\t%d\t%d\t%s\n",
+		fmt.Fprintf(f.writer, "%d\t%s\t%s\t%s\t%d\t%d\t%s\n",
 			snapshot.ID,
 			snapshot.Key,
 			database.SnapshotKindString(snapshot.Kind),
 			parent,
-			contentID,
-			truncateString(path, 20),
 			snapshot.Inodes,
 			snapshot.Size,
 			created)
@@ -94,15 +84,11 @@ func (f *TableFormatter) FormatSnapshot(snapshot *database.SnapshotInfo) error {
 
 // FormatDevboxStorage formats devbox storage information as a table
 func (f *TableFormatter) FormatDevboxStorage(storage []database.DevboxStorageInfo) error {
-	fmt.Fprintln(f.writer, "CONTENT_ID\tSNAPSHOT_KEY\tLV_NAME\tPATH\tSTATUS")
+	fmt.Fprintln(f.writer, "CONTENT_ID\tSNAPSHOT_KEY\tLV_NAME\tSTATUS")
 	for _, item := range storage {
 		lvName := item.LvName
 		if lvName == "" {
 			lvName = "-"
-		}
-		path := item.Path
-		if path == "" {
-			path = "-"
 		}
 		status := item.Status
 		if status == "" {
@@ -113,11 +99,10 @@ func (f *TableFormatter) FormatDevboxStorage(storage []database.DevboxStorageInf
 			snapshotKey = "-"
 		}
 
-		fmt.Fprintf(f.writer, "%s\t%s\t%s\t%s\t%s\n",
+		fmt.Fprintf(f.writer, "%s\t%s\t%s\t%s\n",
 			item.ContentID,
-			truncateString(snapshotKey, 16),
+			snapshotKey,
 			lvName,
-			truncateString(path, 30),
 			status)
 	}
 	return f.writer.Flush()

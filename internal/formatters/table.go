@@ -31,22 +31,27 @@ func (f *TableFormatter) FormatBuckets(buckets []database.BucketInfo) error {
 
 // FormatSnapshots formats snapshot information as a table
 func (f *TableFormatter) FormatSnapshots(snapshots []database.SnapshotInfo) error {
-	fmt.Fprintln(f.writer, "ID\tKEY\tKIND\tPARENT\tINODES\tSIZE\tCREATED")
+	fmt.Fprintln(f.writer, "ID\tKEY\tKIND\tPARENT\tINODES\tSIZE\tCREATED\tPATH")
 	for _, snapshot := range snapshots {
 		created := snapshot.CreatedAt.Format("2006-01-02 15:04:05")
 		parent := snapshot.Parent
 		if parent == "" {
 			parent = "-"
 		}
+		path := snapshot.Path
+		if path == "" {
+			path = "-"
+		}
 
-		fmt.Fprintf(f.writer, "%d\t%s\t%s\t%s\t%d\t%d\t%s\n",
+		fmt.Fprintf(f.writer, "%d\t%s\t%s\t%s\t%d\t%d\t%s\t%s\n",
 			snapshot.ID,
 			snapshot.Key,
 			database.SnapshotKindString(snapshot.Kind),
 			parent,
 			snapshot.Inodes,
 			snapshot.Size,
-			created)
+			created,
+			path)
 	}
 	return f.writer.Flush()
 }
